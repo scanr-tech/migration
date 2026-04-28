@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$ESE Migration Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111318;
+    --bg3: #181b22;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f0;
+    --muted: #6b7280;
+    --dim: #3a3f4a;
+    --bnb: #F3BA2F;
+    --bnb-dim: rgba(243,186,47,0.12);
+    --eth: #627EEA;
+    --eth-dim: rgba(98,126,234,0.12);
+    --blast: #FCFC03;
+    --blast-dim: rgba(252,252,3,0.10);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(10,12,15,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--bnb) 0%, #e8a800 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #000;
+  }
+  .logo-text { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  #lastUpdated { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  #refreshBtn {
+    display: flex; align-items: center; gap: 7px;
+    background: transparent; border: 1px solid var(--border2);
+    color: var(--text); font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 600;
+    padding: 8px 18px; border-radius: 8px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  #refreshBtn:hover { background: var(--bg3); border-color: rgba(255,255,255,0.2); }
+  #refreshBtn.loading { opacity: 0.5; pointer-events: none; }
+  .spin { display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── STATUS ── */
+  #statusBar {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 8px 40px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    min-height: 34px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #statusBar.error { color: var(--red); }
+  #statusBar.ok { color: var(--green); }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse-dot 2s ease infinite;
+    flex-shrink: 0;
+  }
+  .status-dot.loading { background: var(--bnb); }
+  .status-dot.error { background: var(--red); animation: none; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── MAIN ── */
+  main { max-width: 1280px; margin: 0 auto; padding: 40px 40px 80px; }
+
+  /* ── SECTION TITLES ── */
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* ── TOP METRICS ── */
+  .top-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+  .metric {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+  .metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+  }
+  .metric.accent-bnb::before { background: var(--bnb); }
+  .metric.accent-green::before { background: var(--green); }
+  .metric.accent-eth::before { background: var(--eth); }
+  .metric.accent-blast::before { background: var(--blast); }
+  .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-family: 'DM Mono', monospace; }
+  .metric-value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 5px; font-family: 'DM Mono', monospace; }
+
+  /* ── MIGRATION PROGRESS ── */
+  .migration-bar-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .migration-bar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px; flex-wrap: wrap; gap: 8px;
+  }
+  .migration-title { font-size: 14px; font-weight: 700; }
+  .migration-pcts { display: flex; gap: 20px; }
+  .pct-item { display: flex; align-items: center; gap: 7px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+  .pct-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .bar-track {
+    height: 14px;
+    background: var(--bg3);
+    border-radius: 99px;
+    overflow: hidden;
+    display: flex;
+    margin-bottom: 10px;
+  }
+  .bar-seg {
+    height: 100%;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+  .bar-seg.bnb { background: var(--bnb); border-radius: 99px 0 0 99px; }
+  .bar-seg.eth { background: var(--eth); }
+  .bar-seg.blast { background: var(--blast); border-radius: 0 99px 99px 0; }
+
+  /* ── CHAIN CARDS GRID ── */
+  .chains-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .chain-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .chain-card-header {
+    padding: 18px 22px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .chain-id { display: flex; align-items: center; gap: 10px; }
+  .chain-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+  }
+  .chain-icon.bnb { background: var(--bnb-dim); color: var(--bnb); }
+  .chain-icon.eth { background: var(--eth-dim); color: var(--eth); }
+  .chain-icon.blast { background: var(--blast-dim); color: var(--blast); }
+  .chain-name-text { font-size: 15px; font-weight: 700; }
+  .chain-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; padding: 3px 9px;
+    border-radius: 99px; font-weight: 500;
+  }
+  .chain-badge.target { background: var(--green-dim); color: var(--green); }
+  .chain-badge.migrating { background: rgba(239,68,68,0.1); color: #f87171; }
+  .chain-card-body { padding: 18px 22px; }
+  .chain-stat-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 5px 0; border-bottom: 1px solid var(--border);
+  }
+  .chain-stat-row:last-child { border-bottom: none; }
+  .chain-stat-label { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .chain-stat-value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chain-stat-pct { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-left: 4px; }
+  .chain-big-num {
+    font-size: 28px; font-weight: 800; letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums; margin-bottom: 4px;
+    padding: 16px 0 4px;
+  }
+  .chain-supply-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 14px; }
+
+  /* ── POOLS TABLE ── */
+  .pools-section { margin-bottom: 40px; }
+  .pools-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .pool-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .pool-card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pool-chain-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pool-chain-dot.bnb { background: var(--bnb); }
+  .pool-chain-dot.eth { background: var(--eth); }
+  .pool-chain-dot.blast { background: var(--blast); }
+  .pool-card-title { font-size: 13px; font-weight: 700; }
+  .pool-row {
+    display: grid;
+    grid-template-columns: 68px 1fr 88px 52px;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pool-row:last-child { border-bottom: none; }
+  .pool-row.header {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--dim);
+    padding-top: 8px; padding-bottom: 8px;
+  }
+  .pool-period { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); }
+  .pool-bar-wrap { height: 4px; background: var(--bg3); border-radius: 99px; overflow: hidden; }
+  .pool-bar-inner { height: 100%; border-radius: 99px; transition: width 0.7s ease; }
+  .pool-bar-inner.bnb { background: var(--bnb); }
+  .pool-bar-inner.eth { background: var(--eth); }
+  .pool-bar-inner.blast { background: var(--blast); }
+  .pool-amount { font-family: 'DM Mono', monospace; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  .pool-pct-text { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-align: right; }
+  .pool-total-row {
+    padding: 10px 18px;
+    background: var(--bg3);
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--border);
+  }
+  .pool-total-label { font-size: 11px; font-weight: 700; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .pool-total-value { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--dim);
+  }
+  .footer-contracts { display: flex; flex-wrap: wrap; gap: 16px; }
+  .contract-item { display: flex; align-items: center; gap: 6px; }
+  .contract-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1024px) {
+    main { padding: 24px 24px 60px; }
+    header { padding: 16px 24px; }
+    footer { padding: 16px 24px; flex-direction: column; gap: 12px; }
+    .top-metrics { grid-template-columns: repeat(2, 1fr); }
+    .chains-grid { grid-template-columns: 1fr; }
+    .pools-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .top-metrics { grid-template-columns: 1fr 1fr; }
+    .migration-pcts { flex-wrap: wrap; gap: 10px; }
+    header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+
+  /* ── ANIMATIONS ── */
+  .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">E</div>
+    <div>
+      <div class="logo-text">$ESE Migration</div>
+      <div class="logo-sub">eesee.io · 3-chain tracker</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="lastUpdated">—</span>
+    <button id="refreshBtn" onclick="fetchAll()">
+      <span id="refreshIcon">↻</span> Refresh
+    </button>
+  </div>
+</header>
+
+<div id="statusBar">
+  <div class="status-dot loading" id="statusDot"></div>
+  <span id="statusText">Initializing...</span>
+</div>
+
+<main>
+
+  <!-- TOP METRICS -->
+  <div class="section-label">Overview</div>
+  <div class="top-metrics">
+    <div class="metric accent-bnb fade-in stagger-1">
+      <div class="metric-label">BNB supply (target chain)</div>
+      <div class="metric-value" id="m-bnb-supply">—</div>
+      <div class="metric-sub" id="m-bnb-pct">— of total</div>
+    </div>
+    <div class="metric accent-eth fade-in stagger-2">
+      <div class="metric-label">ETH supply (migrating)</div>
+      <div class="metric-value" id="m-eth-supply">—</div>
+      <div class="metric-sub" id="m-eth-pct">— of total</div>
+    </div>
+    <div class="metric accent-blast fade-in stagger-3">
+      <div class="metric-label">Blast supply (migrating)</div>
+      <div class="metric-value" id="m-blast-supply">—</div>
+      <div class="metric-sub" id="m-blast-pct">— of total</div>
+    </div>
+    <div class="metric accent-green fade-in stagger-4">
+      <div class="metric-label">Total staked (all chains)</div>
+      <div class="metric-value" id="m-total-staked">—</div>
+      <div class="metric-sub" id="m-total-staked-pct">— of combined supply</div>
+    </div>
+  </div>
+
+  <!-- MIGRATION PROGRESS BAR -->
+  <div class="migration-bar-section fade-in">
+    <div class="migration-bar-header">
+      <div class="migration-title">Chain distribution</div>
+      <div class="migration-pcts">
+        <div class="pct-item"><div class="pct-dot" style="background:var(--bnb)"></div><span id="bar-label-bnb">BNB —%</span></div>
+        <div class="pct-item"><div class="pct-dot" style="background:var(--eth)"></div><span id="bar-label-eth">ETH —%</span></div>
+        <div class="pct-item"><div class="pct-dot" style="background:var(--blast)"></div><span id="bar-label-blast">Blast —%</span></div>
+      </div>
+    </div>
+    <div class="bar-track">
+      <div class="bar-seg bnb" id="seg-bnb" style="width:0%"></div>
+      <div class="bar-seg eth" id="seg-eth" style="width:0%"></div>
+      <div class="bar-seg blast" id="seg-blast" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- CHAIN CARDS -->
+  <div class="section-label">Per-chain breakdown</div>
+  <div class="chains-grid">
+
+    <!-- BNB -->
+    <div class="chain-card fade-in stagger-1">
+      <div class="chain-card-header">
+        <div class="chain-id">
+          <div class="chain-icon bnb">B</div>
+          <div class="chain-name-text">BNB Chain</div>
+        </div>
+        <div class="chain-badge target">Target</div>
+      </div>
+      <div class="chain-card-body">
+        <div class="chain-big-num" id="bnb-supply-big" style="color:var(--bnb)">—</div>
+        <div class="chain-supply-sub" id="bnb-supply-sub">ESE · BNB Chain</div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Total staked</span>
+          <span><span class="chain-stat-value" id="bnb-staked">—</span><span class="chain-stat-pct" id="bnb-staked-pct"></span></span>
+        </div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Unstaked</span>
+          <span><span class="chain-stat-value" id="bnb-unstaked">—</span><span class="chain-stat-pct" id="bnb-unstaked-pct"></span></span>
+        </div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Staking pools</span>
+          <span class="chain-stat-value">6 pools (45d–1095d)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETH -->
+    <div class="chain-card fade-in stagger-2">
+      <div class="chain-card-header">
+        <div class="chain-id">
+          <div class="chain-icon eth">Ξ</div>
+          <div class="chain-name-text">Ethereum</div>
+        </div>
+        <div class="chain-badge migrating">Migrating</div>
+      </div>
+      <div class="chain-card-body">
+        <div class="chain-big-num" id="eth-supply-big" style="color:var(--eth)">—</div>
+        <div class="chain-supply-sub" id="eth-supply-sub">ESE · Ethereum</div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Total staked</span>
+          <span><span class="chain-stat-value" id="eth-staked">—</span><span class="chain-stat-pct" id="eth-staked-pct"></span></span>
+        </div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Free / migratable</span>
+          <span><span class="chain-stat-value" id="eth-unstaked">—</span><span class="chain-stat-pct" id="eth-unstaked-pct"></span></span>
+        </div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Staking pools</span>
+          <span class="chain-stat-value">6 pools (45d–1095d)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLAST -->
+    <div class="chain-card fade-in stagger-3">
+      <div class="chain-card-header">
+        <div class="chain-id">
+          <div class="chain-icon blast">⚡</div>
+          <div class="chain-name-text">Blast</div>
+        </div>
+        <div class="chain-badge migrating">Migrating</div>
+      </div>
+      <div class="chain-card-body">
+        <div class="chain-big-num" id="blast-supply-big" style="color:var(--blast)">—</div>
+        <div class="chain-supply-sub" id="blast-supply-sub">ESE · Blast</div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Total staked</span>
+          <span><span class="chain-stat-value" id="blast-staked">—</span><span class="chain-stat-pct" id="blast-staked-pct"></span></span>
+        </div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Free / migratable</span>
+          <span><span class="chain-stat-value" id="blast-unstaked">—</span><span class="chain-stat-pct" id="blast-unstaked-pct"></span></span>
+        </div>
+        <div class="chain-stat-row">
+          <span class="chain-stat-label">Staking pools</span>
+          <span class="chain-stat-value">4 pools (45d–365d)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAKING POOLS BREAKDOWN -->
+  <div class="pools-section">
+    <div class="section-label">Staking pools detail</div>
+    <div class="pools-grid">
+
+      <!-- BNB pools -->
+      <div class="pool-card fade-in stagger-1">
+        <div class="pool-card-header">
+          <div class="pool-chain-dot bnb"></div>
+          <div class="pool-card-title">BNB Chain — staking pools</div>
+        </div>
+        <div class="pool-row header">
+          <span>Lock</span><span>Distribution</span><span style="text-align:right">Tokens</span><span style="text-align:right">%</span>
+        </div>
+        <div id="bnb-pools-rows"></div>
+        <div class="pool-total-row">
+          <span class="pool-total-label">Total staked</span>
+          <span class="pool-total-value" id="bnb-pools-total">—</span>
+        </div>
+      </div>
+
+      <!-- ETH pools -->
+      <div class="pool-card fade-in stagger-2">
+        <div class="pool-card-header">
+          <div class="pool-chain-dot eth"></div>
+          <div class="pool-card-title">Ethereum — staking pools</div>
+        </div>
+        <div class="pool-row header">
+          <span>Lock</span><span>Distribution</span><span style="text-align:right">Tokens</span><span style="text-align:right">%</span>
+        </div>
+        <div id="eth-pools-rows"></div>
+        <div class="pool-total-row">
+          <span class="pool-total-label">Total staked</span>
+          <span class="pool-total-value" id="eth-pools-total">—</span>
+        </div>
+      </div>
+
+      <!-- Blast pools -->
+      <div class="pool-card fade-in stagger-3">
+        <div class="pool-card-header">
+          <div class="pool-chain-dot blast"></div>
+          <div class="pool-card-title">Blast — staking pools</div>
+        </div>
+        <div class="pool-row header">
+          <span>Lock</span><span>Distribution</span><span style="text-align:right">Tokens</span><span style="text-align:right">%</span>
+        </div>
+        <div id="blast-pools-rows"></div>
+        <div class="pool-total-row">
+          <span class="pool-total-label">Total staked</span>
+          <span class="pool-total-value" id="blast-pools-total">—</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-contracts">
+    <span class="contract-item"><div class="contract-dot" style="background:var(--bnb)"></div>BNB: 0x491e6DE...f58c</span>
+    <span class="contract-item"><div class="contract-dot" style="background:var(--eth)"></div>ETH: 0x908dDb...C4</span>
+    <span class="contract-item"><div class="contract-dot" style="background:var(--blast)"></div>Blast: 0x491e6DE...f58c</span>
+  </div>
+  <span>Data: Etherscan API + BNB public RPC</span>
+</footer>
+
+<script>
+const ETHERSCAN_KEY = '7V1UBDAFVS2DQ2P4HEIABHXCQ58TWVG9ZV';
+const DECIMALS = 18;
+const DIV = Math.pow(10, DECIMALS);
+
+const TOKENS = {
+  eth:   { addr: '0x908dDb096BFb3AcB19e2280aAD858186ea4935C4', chain: 1 },
+  blast: { addr: '0x491e6DE43b55c8EAE702EDC263E32339da42f58c', chain: 81457 },
+  bnb:   { addr: '0x491e6DE43b55c8EAE702EDC263E32339da42f58c' }
+};
+
+const POOLS = {
+  bnb: [
+    { label: '45d',   addr: '0xf88281c14c1d82e17123bd8f01261bd4aa241ac0' },
+    { label: '90d',   addr: '0x2817453e6e9847aa86a4d0adb83e3327f29d88e1' },
+    { label: '180d',  addr: '0x0a699a82b72f6dbd7eb51457457a404929515368' },
+    { label: '365d',  addr: '0x2116954287e0fd5ff8044917c8a85dedcca9802c' },
+    { label: '730d',  addr: '0x361b90609fc4e6e36e88D5f15e387469FD897Ca6' },
+    { label: '1095d', addr: '0xF9128310D9cC647F39cBB1761b2a4f33a6534bBC' }
+  ],
+  eth: [
+    { label: '45d',   addr: '0x944ab1961abbcdae387b94114ae93830d137c25c' },
+    { label: '90d',   addr: '0x3d374c2e1fe5b228a11ee861e1dc823d18680c54' },
+    { label: '180d',  addr: '0x5a3da96bdbbde08eab6f963e74a77c44506e5460' },
+    { label: '365d',  addr: '0x514e76ca58d66223f183281ba41fad6381c31c7a' },
+    { label: '730d',  addr: '0xA3D7EEeCB2A9e5cBEf29241278bF1090Bb0D3BB1' },
+    { label: '1095d', addr: '0x3089C63b11f5d29bdbb585E19C16DE0479D4b048' }
+  ],
+  blast: [
+    { label: '45d',  addr: '0x1cBcDaDA8356e396DdC03Db4Ef0638F013F4b877' },
+    { label: '90d',  addr: '0xE22A93B5458618883d5Db8828518a7EE8835b41A' },
+    { label: '180d', addr: '0x7FF8926E7574151AFedb4d5cE1Bd358FE360dd2a' },
+    { label: '365d', addr: '0xaeF6bc67feb8d841bf20e1AFbB78c9E2f0405Fd9' }
+  ]
+};
+
+const BNB_RPC = 'https://bsc-dataseed.binance.org/';
+
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toFixed(0);
+}
+function pct(a, b) {
+  if (!b || b === 0) return '0.00%';
+  return ((a / b) * 100).toFixed(2) + '%';
+}
+function pctNum(a, b) {
+  if (!b || b === 0) return 0;
+  return (a / b) * 100;
+}
+
+function setStatus(msg, state) {
+  document.getElementById('statusText').textContent = msg;
+  const dot = document.getElementById('statusDot');
+  const bar = document.getElementById('statusBar');
+  dot.className = 'status-dot ' + (state || 'loading');
+  bar.className = state === 'error' ? 'error' : (state === 'ok' ? 'ok' : '');
+}
+
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// Etherscan V2 API
+async function ethscanSupply(chainId, token) {
+  const url = `https://api.etherscan.io/v2/api?chainid=${chainId}&module=stats&action=tokensupply&contractaddress=${token}&apikey=${ETHERSCAN_KEY}`;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    if (d.status === '1' && d.result) return parseFloat(d.result) / DIV;
+    return null;
+  } catch { return null; }
+}
+
+async function ethscanBalance(chainId, token, holder) {
+  const url = `https://api.etherscan.io/v2/api?chainid=${chainId}&module=account&action=tokenbalance&contractaddress=${token}&address=${holder}&tag=latest&apikey=${ETHERSCAN_KEY}`;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    if (d.status === '1' && d.result) return parseFloat(d.result) / DIV;
+    return 0;
+  } catch { return 0; }
+}
+
+// BNB via public JSON-RPC
+function encodeBalanceOf(addr) {
+  const sig = '0x70a08231';
+  const padded = addr.toLowerCase().replace('0x','').padStart(64,'0');
+  return sig + padded;
+}
+function encodeTotalSupply() { return '0x18160ddd'; }
+
+async function bnbRpcCall(data, to) {
+  try {
+    const r = await fetch(BNB_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to, data }, 'latest'] })
+    });
+    const d = await r.json();
+    if (d.result && d.result !== '0x') {
+      return parseInt(d.result, 16) / DIV;
+    }
+    return null;
+  } catch { return null; }
+}
+
+async function bnbSupply() {
+  return bnbRpcCall(encodeTotalSupply(), TOKENS.bnb.addr);
+}
+
+async function bnbBalance(holder) {
+  return bnbRpcCall(encodeBalanceOf(holder), TOKENS.bnb.addr);
+}
+
+function renderPools(chainKey, color, pools, chainSupply) {
+  const container = document.getElementById(chainKey + '-pools-rows');
+  if (!container) return;
+  container.innerHTML = '';
+  const maxAmt = Math.max(...pools.map(p => p.amount), 0.001);
+  let total = 0;
+  pools.forEach(p => {
+    total += p.amount || 0;
+    const barW = maxAmt > 0 ? Math.min((p.amount / maxAmt) * 100, 100).toFixed(1) : 0;
+    const row = document.createElement('div');
+    row.className = 'pool-row';
+    row.innerHTML = `
+      <span class="pool-period">${p.label}</span>
+      <div class="pool-bar-wrap"><div class="pool-bar-inner ${chainKey}" style="width:${barW}%"></div></div>
+      <span class="pool-amount">${fmt(p.amount)}</span>
+      <span class="pool-pct-text">${pct(p.amount, chainSupply)}</span>
+    `;
+    container.appendChild(row);
+  });
+  set(chainKey + '-pools-total', fmt(total));
+}
+
+async function fetchAll() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  btn.classList.add('loading');
+  icon.className = 'spin';
+  icon.textContent = '↻';
+
+  setStatus('Fetching supplies from Etherscan API + BNB RPC...', 'loading');
+
+  // Fetch all supplies in parallel
+  const [ethSupply, blastSupply, bnbSup] = await Promise.all([
+    ethscanSupply(1, TOKENS.eth.addr),
+    ethscanSupply(81457, TOKENS.blast.addr),
+    bnbSupply()
+  ]);
+
+  setStatus('Fetching staking pool balances (16 contracts)...', 'loading');
+
+  // Fetch all pool balances in parallel
+  const [
+    ...ethBalances
+  ] = await Promise.all(
+    POOLS.eth.map(p => ethscanBalance(1, TOKENS.eth.addr, p.addr))
+  );
+  const blastBalances = await Promise.all(
+    POOLS.blast.map(p => ethscanBalance(81457, TOKENS.blast.addr, p.addr))
+  );
+  const bnbBalances = await Promise.all(
+    POOLS.bnb.map(p => bnbBalance(p.addr))
+  );
+
+  // Compute totals
+  const eth = ethSupply || 0;
+  const blast = blastSupply || 0;
+  const bnb = bnbSup || 0;
+  const total = eth + blast + bnb;
+
+  const ethPoolData  = POOLS.eth.map((p,i)  => ({ ...p, amount: ethBalances[i]  || 0 }));
+  const blastPoolData= POOLS.blast.map((p,i) => ({ ...p, amount: blastBalances[i]|| 0 }));
+  const bnbPoolData  = POOLS.bnb.map((p,i)  => ({ ...p, amount: bnbBalances[i]  || 0 }));
+
+  const ethStaked   = ethPoolData.reduce((s,p)  => s + p.amount, 0);
+  const blastStaked = blastPoolData.reduce((s,p) => s + p.amount, 0);
+  const bnbStaked   = bnbPoolData.reduce((s,p)  => s + p.amount, 0);
+  const totalStaked = ethStaked + blastStaked + bnbStaked;
+
+  // Top metrics
+  set('m-bnb-supply', fmt(bnb));
+  set('m-bnb-pct', pct(bnb, total) + ' of total');
+  set('m-eth-supply', fmt(eth));
+  set('m-eth-pct', pct(eth, total) + ' of total');
+  set('m-blast-supply', fmt(blast));
+  set('m-blast-pct', pct(blast, total) + ' of total');
+  set('m-total-staked', fmt(totalStaked));
+  set('m-total-staked-pct', pct(totalStaked, total) + ' of combined supply');
+
+  // Bar
+  const bnbPct  = pctNum(bnb, total);
+  const ethPct  = pctNum(eth, total);
+  const blastPct= pctNum(blast, total);
+  document.getElementById('seg-bnb').style.width   = bnbPct.toFixed(2) + '%';
+  document.getElementById('seg-eth').style.width   = ethPct.toFixed(2) + '%';
+  document.getElementById('seg-blast').style.width = blastPct.toFixed(2) + '%';
+  set('bar-label-bnb',   'BNB ' + bnbPct.toFixed(1) + '%');
+  set('bar-label-eth',   'ETH ' + ethPct.toFixed(1) + '%');
+  set('bar-label-blast', 'Blast ' + blastPct.toFixed(1) + '%');
+
+  // Chain cards
+  set('bnb-supply-big', fmt(bnb));
+  set('bnb-supply-sub', fmt(bnb) + ' ESE · BNB Chain');
+  set('bnb-staked', fmt(bnbStaked));
+  set('bnb-staked-pct', '(' + pct(bnbStaked, bnb) + ')');
+  set('bnb-unstaked', fmt(bnb - bnbStaked));
+  set('bnb-unstaked-pct', '(' + pct(bnb - bnbStaked, bnb) + ')');
+
+  set('eth-supply-big', fmt(eth));
+  set('eth-supply-sub', fmt(eth) + ' ESE · Ethereum');
+  set('eth-staked', fmt(ethStaked));
+  set('eth-staked-pct', '(' + pct(ethStaked, eth) + ')');
+  set('eth-unstaked', fmt(eth - ethStaked));
+  set('eth-unstaked-pct', '(' + pct(eth - ethStaked, eth) + ')');
+
+  set('blast-supply-big', fmt(blast));
+  set('blast-supply-sub', fmt(blast) + ' ESE · Blast');
+  set('blast-staked', fmt(blastStaked));
+  set('blast-staked-pct', '(' + pct(blastStaked, blast) + ')');
+  set('blast-unstaked', fmt(blast - blastStaked));
+  set('blast-unstaked-pct', '(' + pct(blast - blastStaked, blast) + ')');
+
+  // Pools
+  renderPools('bnb', 'bnb', bnbPoolData, bnb);
+  renderPools('eth', 'eth', ethPoolData, eth);
+  renderPools('blast', 'blast', blastPoolData, blast);
+
+  const now = new Date();
+  set('lastUpdated', 'Updated ' + now.toLocaleTimeString());
+  setStatus('All data loaded · ETH & Blast via Etherscan API · BNB via public RPC', 'ok');
+
+  btn.classList.remove('loading');
+  icon.className = '';
+  icon.textContent = '↻';
+}
+
+fetchAll();
+</script>
+</body>
+</html>
