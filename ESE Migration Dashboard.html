@@ -317,6 +317,7 @@
   </div>
   <div class="header-right">
     <span id="lastUpdated">—</span>
+    <span id="nextRefresh" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)"></span>
     <button id="refreshBtn" onclick="fetchAll()">
       <span id="refreshIcon">↻</span> Refresh
     </button>
@@ -369,6 +370,27 @@
       <div class="bar-seg bnb" id="seg-bnb" style="width:0%"></div>
       <div class="bar-seg eth" id="seg-eth" style="width:0%"></div>
       <div class="bar-seg blast" id="seg-blast" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- NON-STAKED MIGRATION -->
+  <div class="migration-bar-section fade-in">
+    <div class="migration-bar-header">
+      <div class="migration-title">Free (non-staked) token migration</div>
+      <div class="migration-pcts">
+        <div class="pct-item"><div class="pct-dot" style="background:var(--bnb)"></div><span id="free-label-bnb">BNB —</span></div>
+        <div class="pct-item"><div class="pct-dot" style="background:var(--eth)"></div><span id="free-label-eth">ETH —</span></div>
+        <div class="pct-item"><div class="pct-dot" style="background:var(--blast)"></div><span id="free-label-blast">Blast —</span></div>
+      </div>
+    </div>
+    <div class="bar-track">
+      <div class="bar-seg bnb" id="free-seg-bnb" style="width:0%"></div>
+      <div class="bar-seg eth" id="free-seg-eth" style="width:0%"></div>
+      <div class="bar-seg blast" id="free-seg-blast" style="width:0%"></div>
+    </div>
+    <div style="display:flex;gap:24px;margin-top:10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">
+      <span>Pending migration (ETH+Blast free): <strong style="color:var(--text)" id="free-pending-total">—</strong> ESE</span>
+      <span>Already on BNB (free): <strong style="color:var(--bnb)" id="free-bnb-total">—</strong> ESE</span>
     </div>
   </div>
 
@@ -666,6 +688,22 @@ function renderPools(chainKey, color, pools, chainSupply) {
   set(chainKey + '-pools-total', fmt(total));
 }
 
+const REFRESH_INTERVAL = 6 * 60 * 60 * 1000;
+let countdownTimer = null;
+
+function startCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  const nextAt = Date.now() + REFRESH_INTERVAL;
+  countdownTimer = setInterval(() => {
+    const rem = nextAt - Date.now();
+    if (rem <= 0) { clearInterval(countdownTimer); fetchAll(); return; }
+    const h = Math.floor(rem / 3600000);
+    const m = Math.floor((rem % 3600000) / 60000);
+    const s = Math.floor((rem % 60000) / 1000);
+    set('nextRefresh', `↺ ${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`);
+  }, 1000);
+}
+
 async function fetchAll() {
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
@@ -733,6 +771,20 @@ async function fetchAll() {
   set('bar-label-eth',   'ETH ' + ethPct.toFixed(1) + '%');
   set('bar-label-blast', 'Blast ' + blastPct.toFixed(1) + '%');
 
+  // Free (non-staked) migration bar
+  const ethFree   = eth   - ethStaked;
+  const blastFree = blast - blastStaked;
+  const bnbFree   = bnb   - bnbStaked;
+  const totalFree = ethFree + blastFree + bnbFree;
+  document.getElementById('free-seg-bnb').style.width   = pctNum(bnbFree,   totalFree).toFixed(2) + '%';
+  document.getElementById('free-seg-eth').style.width   = pctNum(ethFree,   totalFree).toFixed(2) + '%';
+  document.getElementById('free-seg-blast').style.width = pctNum(blastFree, totalFree).toFixed(2) + '%';
+  set('free-label-bnb',   'BNB '   + fmt(bnbFree)   + ' (' + pct(bnbFree,   totalFree) + ')');
+  set('free-label-eth',   'ETH '   + fmt(ethFree)   + ' (' + pct(ethFree,   totalFree) + ')');
+  set('free-label-blast', 'Blast ' + fmt(blastFree) + ' (' + pct(blastFree, totalFree) + ')');
+  set('free-pending-total', fmt(ethFree + blastFree));
+  set('free-bnb-total', fmt(bnbFree));
+
   // Chain cards
   set('bnb-supply-big', fmt(bnb));
   set('bnb-supply-sub', fmt(bnb) + ' ESE · BNB Chain');
@@ -767,6 +819,7 @@ async function fetchAll() {
   btn.classList.remove('loading');
   icon.className = '';
   icon.textContent = '↻';
+  startCountdown();
 }
 
 fetchAll();
