@@ -631,14 +631,32 @@ async function ethscanSupply(chainId, token) {
   } catch { return null; }
 }
 
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 async function ethscanBalance(chainId, token, holder) {
   const url = `https://api.etherscan.io/v2/api?chainid=${chainId}&module=account&action=tokenbalance&contractaddress=${token}&address=${holder}&tag=latest&apikey=${ETHERSCAN_KEY}`;
-  try {
-    const r = await fetch(url);
-    const d = await r.json();
-    if (d.status === '1' && d.result) return parseFloat(d.result) / DIV;
-    return 0;
-  } catch { return 0; }
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.status === '1' && d.result) return parseFloat(d.result) / DIV;
+      if (d.result && d.result.toLowerCase().includes('rate limit')) {
+        await delay(1000 * (attempt + 1));
+        continue;
+      }
+      return 0;
+    } catch { await delay(500); }
+  }
+  return 0;
+}
+
+async function fetchSequential(calls, gapMs = 210) {
+  const results = [];
+  for (const fn of calls) {
+    results.push(await fn());
+    await delay(gapMs);
+  }
+  return results;
 }
 
 // BNB via public JSON-RPC
@@ -728,15 +746,14 @@ async function fetchAll() {
 
   setStatus('Fetching staking pool balances (16 contracts)...', 'loading');
 
-  // Fetch all pool balances in parallel
-  const [
-    ...ethBalances
-  ] = await Promise.all(
-    POOLS.eth.map(p => ethscanBalance(1, TOKENS.eth.addr, p.addr))
+  // ETH + Blast pools sequential (respect 5 req/s Etherscan limit)
+  const ethBalances = await fetchSequential(
+    POOLS.eth.map(p => () => ethscanBalance(1, TOKENS.eth.addr, p.addr))
   );
-  const blastBalances = await Promise.all(
-    POOLS.blast.map(p => ethscanBalance(81457, TOKENS.blast.addr, p.addr))
+  const blastBalances = await fetchSequential(
+    POOLS.blast.map(p => () => ethscanBalance(81457, TOKENS.blast.addr, p.addr))
   );
+  // BNB uses its own RPC — can run in parallel
   const bnbBalances = await Promise.all(
     POOLS.bnb.map(p => bnbBalance(p.addr))
   );
