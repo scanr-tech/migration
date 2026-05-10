@@ -583,7 +583,13 @@ const POOLS = {
   ]
 };
 
-const BNB_RPC = 'https://bsc-dataseed.binance.org/';
+const BNB_RPCS = [
+  'https://bsc-dataseed.binance.org/',
+  'https://bsc-dataseed1.binance.org/',
+  'https://bsc-dataseed2.binance.org/',
+  'https://bsc-dataseed3.binance.org/',
+  'https://bsc-dataseed4.binance.org/',
+];
 
 function fmt(n) {
   if (n === null || n === undefined || isNaN(n)) return '—';
@@ -644,18 +650,18 @@ function encodeBalanceOf(addr) {
 function encodeTotalSupply() { return '0x18160ddd'; }
 
 async function bnbRpcCall(data, to) {
-  try {
-    const r = await fetch(BNB_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to, data }, 'latest'] })
-    });
-    const d = await r.json();
-    if (d.result && d.result !== '0x') {
-      return parseInt(d.result, 16) / DIV;
-    }
-    return null;
-  } catch { return null; }
+  for (const rpc of BNB_RPCS) {
+    try {
+      const r = await fetch(rpc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to, data }, 'latest'] })
+      });
+      const d = await r.json();
+      if (d.result && d.result !== '0x') return parseInt(d.result, 16) / DIV;
+    } catch { continue; }
+  }
+  return null;
 }
 
 async function bnbSupply() {
